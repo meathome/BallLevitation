@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Ball Levitation Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg:           #0a0c10;
+      --panel:        #0f1318;
+      --border:       #1e2a38;
+      --accent:       #00e5ff;
+      --accent2:      #ff6b35;
+      --green:        #39ff14;
+      --red:          #ff2d55;
+      --text:         #c8d8e8;
+      --dim:          #4a6070;
+      --font-mono:    'Share Tech Mono', monospace;
+      --font-display: 'Orbitron', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-mono);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 16px;
+      background-image:
+        radial-gradient(ellipse at 20% 0%,   rgba(0,229,255,0.04)  0%, transparent 60%),
+        radial-gradient(ellipse at 80% 100%, rgba(255,107,53,0.04) 0%, transparent 60%);
+    }
+
+    /* ── HEADER ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+    }
+
+    header h1 {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      color: var(--accent);
+      text-shadow: 0 0 20px rgba(0,229,255,0.4);
+    }
+
+    #status {
+      font-family: var(--font-display);
+      font-size: 11px;
+      letter-spacing: 2px;
+      padding: 6px 14px;
+      border-radius: 4px;
+      border: 1px solid var(--dim);
+      color: var(--dim);
+      transition: all 0.3s;
+    }
+    #status.connected    { color: var(--green); border-color: var(--green); box-shadow: 0 0 12px rgba(57,255,20,0.2); }
+    #status.disconnected { color: var(--red);   border-color: var(--red); }
+
+    /* ── BUTTON ROW ── */
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    button {
+      font-family: var(--font-display);
+      font-size: 10px;
+      letter-spacing: 2px;
+      padding: 10px 16px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    button:hover        { border-color: var(--accent);  color: var(--accent);  box-shadow: 0 0 10px rgba(0,229,255,0.15); }
+    button.danger:hover { border-color: var(--accent2); color: var(--accent2); box-shadow: 0 0 10px rgba(255,107,53,0.2); }
+    button:disabled     { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── MAIN GRID ── */
+    .grid {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+
+    /* ── PANEL ── */
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+
+    .panel-title {
+      font-family: var(--font-display);
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: var(--dim);
+      margin-bottom: 18px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── SLIDERS ── */
+    .slider-group { margin-bottom: 22px; }
+
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+    .slider-label span:first-child {
+      font-family: var(--font-display);
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--accent);
+    }
+    .slider-value { font-size: 18px; color: #fff; min-width: 60px; text-align: right; }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(0,229,255,0.5);
+      transition: transform 0.1s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+    #sp::-webkit-slider-thumb { background: var(--accent2); box-shadow: 0 0 8px rgba(255,107,53,0.5); }
+
+    /* ── TELEMETRY ── */
+    .telem-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .telem-cell {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+    }
+    .telem-cell .t-label { font-size: 9px; letter-spacing: 2px; color: var(--dim); margin-bottom: 4px; font-family: var(--font-display); }
+    .telem-cell .t-value { font-size: 22px; color: #fff; }
+    .telem-cell .t-unit  { font-size: 11px; color: var(--dim); margin-left: 3px; }
+
+    /* ── CHART ── */
+    .chart-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .chart-panel canvas { width: 100% !important; height: 380px !important; }
+
+    /* ── MODE PILLS ── */
+    .mode-row { display: flex; gap: 8px; margin-top: 18px; }
+    .mode-pill {
+      font-family: var(--font-display);
+      font-size: 9px;
+      letter-spacing: 2px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      color: var(--dim);
+      transition: all 0.3s;
+    }
+    .mode-pill.active      { border-color: var(--green);  color: var(--green);  box-shadow: 0 0 8px rgba(57,255,20,0.2); }
+    .mode-pill.tune-active { border-color: var(--accent2); color: var(--accent2); box-shadow: 0 0 8px rgba(255,107,53,0.3); animation: pulse 1s ease-in-out infinite; }
+
+    /* ── AUTOTUNE STATUS ── */
+    #tuneStatus {
+      font-family: var(--font-display);
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--accent2);
+      margin-top: 10px;
+      min-height: 18px;
+      text-align: center;
+    }
+
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>⬡ BALL LEVITATION 8 </h1>
+  <div id="status" class="disconnected">DISCONNECTED</div>
+</header>
+
+<div class="btn-row">
+  <button id="btnConnect"   onclick="connectBLE()">▶ CONNECT</button>
+  <button id="btnReconnect" onclick="reconnectBLE()">↺ RECONNECT</button>
+  <button id="btnFreeze"    onclick="toggleFreeze()">⏸ FREEZE</button>
+  <button id="btnCSV"       onclick="downloadCSV()">↓ CSV</button>
+  <button id="btnTune"      class="danger" onclick="startAutoTune()">⚡ AUTOTUNE</button>
+</div>
+
+<div class="grid">
+
+  <!-- LEFT: controls -->
+  <div>
+    <div class="panel">
+      <div class="panel-title">PID PARAMETERS</div>
+
+      <div class="slider-group">
+        <div class="slider-label">
+          <span>Kp</span>
+          <span class="slider-value" id="kpVal">1.20</span>
+        </div>
+        <input type="range" id="kp" min="0" max="5" step="0.05" value="1.2" oninput="onSlider()">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label">
+          <span>Ki</span>
+          <span class="slider-value" id="kiVal">0.80</span>
+        </div>
+        <input type="range" id="ki" min="0" max="5" step="0.05" value="0.8" oninput="onSlider()">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label">
+          <span>Kd</span>
+          <span class="slider-value" id="kdVal">1.50</span>
+        </div>
+        <input type="range" id="kd" min="0" max="5" step="0.05" value="1.5" oninput="onSlider()">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label">
+          <span style="color:var(--accent2)">SETPOINT</span>
+          <span class="slider-value" id="spVal">700</span>
+        </div>
+        <input type="range" id="sp" min="50" max="950" step="1" value="700" oninput="onSlider()">
+      </div>
+
+      <div id="tuneStatus"></div>
+
+      <div class="mode-row">
+        <div class="mode-pill active" id="modeAuto">AUTO</div>
+        <div class="mode-pill"        id="modeManual">MANUAL</div>
+        <div class="mode-pill"        id="modeTune">TUNE</div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <div class="panel-title">TELEMETRY</div>
+      <div class="telem-grid">
+        <div class="telem-cell">
+          <div class="t-label">POSITION</div>
+          <div><span class="t-value" id="tPos">—</span><span class="t-unit">mm</span></div>
+        </div>
+        <div class="telem-cell">
+          <div class="t-label">SETPOINT</div>
+          <div><span class="t-value" id="tSp">—</span><span class="t-unit">mm</span></div>
+        </div>
+        <div class="telem-cell">
+          <div class="t-label">PWM</div>
+          <div><span class="t-value" id="tPwm">—</span><span class="t-unit">/255</span></div>
+        </div>
+        <div class="telem-cell">
+          <div class="t-label">ERROR</div>
+          <div><span class="t-value" id="tErr">—</span><span class="t-unit">mm</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: chart -->
+  <div class="chart-panel">
+    <div class="panel-title">POSITION  vs  SETPOINT</div>
+    <canvas id="chart"></canvas>
+  </div>
+
+</div>
+
+<script>
+// ── State ──
+let device, rxChar;
+let frozen          = false;
+let initialSyncDone = false;
+let tuning          = false;
+let lastKp          = null;
+let logData         = [];
+
+// ── DOM refs ──
+const kpEl       = document.getElementById('kp');
+const kiEl       = document.getElementById('ki');
+const kdEl       = document.getElementById('kd');
+const spEl       = document.getElementById('sp');
+const kpVal      = document.getElementById('kpVal');
+const kiVal      = document.getElementById('kiVal');
+const kdVal      = document.getElementById('kdVal');
+const spVal      = document.getElementById('spVal');
+const btnTune    = document.getElementById('btnTune');
+const tuneStatus = document.getElementById('tuneStatus');
+
+// ── Status ──
+function setStatus(connected) {
+  const el = document.getElementById('status');
+  el.textContent = connected ? 'CONNECTED' : 'DISCONNECTED';
+  el.className   = connected ? 'connected'  : 'disconnected';
+}
+
+// ── Mode pills ──
+function setMode(mode) {
+  document.getElementById('modeAuto').className   = 'mode-pill' + (mode === 'auto'   ? ' active' : '');
+  document.getElementById('modeManual').className = 'mode-pill' + (mode === 'manual' ? ' active' : '');
+  document.getElementById('modeTune').className   = 'mode-pill' + (mode === 'tune'   ? ' tune-active' : '');
+}
+
+// ── Chart ──
+const ctx   = document.getElementById('chart').getContext('2d');
+const chart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      {
+        label: 'Position',
+        data: [],
+        borderColor: '#00e5ff',
+        backgroundColor: 'rgba(0,229,255,0.05)',
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.3,
+        fill: true
+      },
+      {
+        label: 'Setpoint',
+        data: [],
+        borderColor: '#ff6b35',
+        borderWidth: 1.5,
+        borderDash: [6, 3],
+        pointRadius: 0,
+        tension: 0
+      }
+    ]
+  },
+  options: {
+    animation: false,
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      y: {
+        min: 0,
+        max: 1000,
+        grid:  { color: 'rgba(255,255,255,0.04)' },
+        ticks: { color: '#4a6070', font: { family: "'Share Tech Mono'" } }
+      },
+      x: { display: false }
+    },
+    plugins: {
+      legend: { labels: { color: '#c8d8e8', font: { family: "'Share Tech Mono'" } } }
+    }
+  }
+});
+
+// ── BLE connect ──
+async function connectBLE() {
+  try {
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ name: 'BallLevitation_8' }],
+      optionalServices: ['12345678-1234-1234-1234-123456789ab8']
+    });
+    device.addEventListener('gattserverdisconnected', onDisconnected);
+    await connectGATT();
+  } catch (e) {
+    console.error(e);
+    setStatus(false);
+  }
+}
+
+async function reconnectBLE() {
+  if (!device) { alert('No device known. Press CONNECT first.'); return; }
+  try { await connectGATT(); } catch (e) { console.log('Reconnect failed', e); }
+}
+
+async function connectGATT() {
+  const server  = await device.gatt.connect();
+  const service = await server.getPrimaryService('12345678-1234-1234-1234-123456789ab8');
+  const tx      = await service.getCharacteristic('abcd1234-5678-1234-5678-abcdef123458');
+  rxChar        = await service.getCharacteristic('dcba4321-8765-4321-8765-fedcba654328');
+
+  await tx.startNotifications();
+  tx.addEventListener('characteristicvaluechanged', handleData);
+
+  initialSyncDone = false;   // re-sync sliders from device on every new connection
+  lastKp = null;
+  setStatus(true);
+  setMode('auto');
+}
+
+function onDisconnected() {
+  setStatus(false);
+  initialSyncDone = false;
+  tuning = false;
+  lastKp = null;
+  setMode('');
+  tuneStatus.textContent = '';
+  btnTune.textContent    = '⚡ AUTOTUNE';
+  btnTune.disabled       = false;
+  setTimeout(() => reconnectBLE(), 1000);
+}
+
+// ── Data handler ──
+function handleData(event) {
+  const value = new TextDecoder().decode(event.target.value);
+  const parts = value.split(',');
+  if (parts.length < 7) return;
+
+  const time = parseInt(parts[0]);
+  const pos  = parseFloat(parts[1]);
+  const sp   = parseFloat(parts[2]);
+  const pwm  = parseFloat(parts[3]);
+  const kp   = parseFloat(parts[4]);
+  const ki   = parseFloat(parts[5]);
+  const kd   = parseFloat(parts[6]);
+
+  // ── Sync sliders once on first packet after (re)connection ──
+  if (!initialSyncDone) {
+    kpEl.value = kp;  kpVal.textContent = kp.toFixed(2);
+    kiEl.value = ki;  kiVal.textContent = ki.toFixed(2);
+    kdEl.value = kd;  kdVal.textContent = kd.toFixed(2);
+    spEl.value = sp;  spVal.textContent = sp.toFixed(0);
+    lastKp = kp;
+    initialSyncDone = true;
+  }
+
+  // ── Detect autotune completion: gains changed on device side ──
+  if (tuning && lastKp !== null && Math.abs(kp - lastKp) > 0.01) {
+    kpEl.value = kp;  kpVal.textContent = kp.toFixed(2);
+    kiEl.value = ki;  kiVal.textContent = ki.toFixed(2);
+    kdEl.value = kd;  kdVal.textContent = kd.toFixed(2);
+    tuning               = false;
+    btnTune.textContent  = '⚡ AUTOTUNE';
+    btnTune.disabled     = false;
+    tuneStatus.textContent = `✓ DONE  Kp=${kp.toFixed(2)}  Ki=${ki.toFixed(2)}  Kd=${kd.toFixed(2)}`;
+    setMode('auto');
+  }
+  lastKp = kp;
+
+  // ── Live telemetry ──
+  document.getElementById('tPos').textContent = pos.toFixed(1);
+  document.getElementById('tSp').textContent  = sp.toFixed(1);
+  document.getElementById('tPwm').textContent = pwm.toFixed(0);
+  document.getElementById('tErr').textContent = (sp - pos).toFixed(1);
+
+  logData.push([time, pos, sp, pwm, kp, ki, kd]);
+
+  if (frozen) return;
+
+  chart.data.labels.push('');
+  chart.data.datasets[0].data.push(pos);
+  chart.data.datasets[1].data.push(sp);
+
+  if (chart.data.labels.length > 200) {
+    chart.data.labels.shift();
+    chart.data.datasets[0].data.shift();
+    chart.data.datasets[1].data.shift();
+  }
+
+  chart.update();
+}
+
+// ── Slider input ──
+function onSlider() {
+  const kp = parseFloat(kpEl.value);
+  const ki = parseFloat(kiEl.value);
+  const kd = parseFloat(kdEl.value);
+  const sp = parseFloat(spEl.value);
+
+  kpVal.textContent = kp.toFixed(2);
+  kiVal.textContent = ki.toFixed(2);
+  kdVal.textContent = kd.toFixed(2);
+  spVal.textContent = sp.toFixed(0);
+
+  sendMsg(`${kp},${ki},${kd},${sp},1,0,0`);
+  setMode('auto');
+}
+
+// ── AutoTune: stabilize at setpoint first, then trigger ──
+async function startAutoTune() {
+  if (tuning) return;
+  tuning = true;
+
+  const sp = parseFloat(spEl.value);
+  const kp = parseFloat(kpEl.value);
+  const ki = parseFloat(kiEl.value);
+  const kd = parseFloat(kdEl.value);
+
+  // Step 1: send current setpoint in auto mode so ball moves to target height
+  sendMsg(`${kp},${ki},${kd},${sp},1,0,0`);
+  setMode('tune');
+  btnTune.disabled = true;
+
+  // Step 2: wait for ball to stabilize near setpoint
+  for (let i = 5; i > 0; i--) {
+    tuneStatus.textContent = `STABILIZING  ${i}s`;
+    btnTune.textContent    = `⏳ ${i}s`;
+    await sleep(1000);
+  }
+
+  // Step 3: trigger autotune — firmware captures smoothPWM as relay bias at this moment
+  sendMsg(`0,0,0,${sp},1,0,1`);
+  tuneStatus.textContent = 'TUNING…';
+  btnTune.textContent    = '⚡ TUNING…';
+  // UI will update automatically when gains change in the incoming data stream
+}
+
+// ── Send helper ──
+function sendMsg(msg) {
+  if (rxChar) {
+    rxChar.writeValue(new TextEncoder().encode(msg)).catch(console.error);
+  }
+}
+
+// ── Freeze ──
+function toggleFreeze() {
+  frozen = !frozen;
+  document.getElementById('btnFreeze').textContent = frozen ? '▶ UNFREEZE' : '⏸ FREEZE';
+}
+
+// ── CSV download ──
+function downloadCSV() {
+  let csv = 'time,position,setpoint,pwm,kp,ki,kd\n';
+  logData.forEach(r => csv += r.join(',') + '\n');
+  const a = document.createElement('a');
+  a.href     = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = 'levitation_' + Date.now() + '.csv';
+  a.click();
+}
+
+// ── Utility ──
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+
+</body>
+</html>
